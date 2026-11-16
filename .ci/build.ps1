@@ -9,14 +9,33 @@ $ErrorActionPreference = "Continue"
 $repoRoot = Resolve-Path (Join-Path $PSScriptRoot "..")
 if (-not $OutDir) { $OutDir = Join-Path $repoRoot "dist" }
 
+if (-not $SdkDir) { $SdkDir = $env:D13X_SDK_DIR }
+if (-not $ToolchainBin) { $ToolchainBin = $env:D13X_TOOLCHAIN_BIN }
 if (-not $SdkDir) {
     throw "SDK_DIR is not set. Point it at a Luban-Lite checkout or let the script clone one."
 }
-if ($ToolchainBin) {
-    $env:PATH = "$ToolchainBin;$env:PATH"
+
+# Make the job independent of the interactive shell's PATH.
+$envRoot = Join-Path $SdkDir "tools\env"
+$extraPaths = @(
+    (Join-Path $envRoot "tools\bin"),
+    (Join-Path $envRoot "tools\Python27\Scripts"),
+    (Join-Path $envRoot "tools\Python27"),
+    (Join-Path $SdkDir "toolchain\bin")
+)
+if ($ToolchainBin) { $extraPaths = @($ToolchainBin) + $extraPaths }
+$pathParts = @($extraPaths | Where-Object { Test-Path $_ })
+if ($pathParts.Count -gt 0) {
+    $env:PATH = ($pathParts -join ";") + ";" + $env:PATH
 }
+$env:PYTHONIOENCODING = "UTF-8"
+$env:SDK_PRJ_TOP_DIR = $SdkDir
+$env:ENV_ROOT = $envRoot
+$env:PKGS_ROOT = Join-Path $envRoot "packages"
+$env:RTT_ROOT = Join-Path $SdkDir "kernel\rt-thread"
+
 if (-not (Get-Command scons -ErrorAction SilentlyContinue)) {
-    throw "scons is not in PATH. Install the SDK's Python 2.7 + SCons and the RISC-V toolchain first."
+    throw "scons is not in PATH. Checked SDK tools\env\tools\Python27\Scripts."
 }
 
 if (-not (Test-Path (Join-Path $SdkDir ".git"))) {
