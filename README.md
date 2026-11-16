@@ -17,7 +17,19 @@
 - 屏幕：7 英寸 1024×600，LVDS **VESA-24**
 - 开发板：衡山派 HSPI-D133EBS（ArtInChip D13x）
 
-> 屏幕适配教程写的是 JEIDA-24，但这块屏实际是 **VESA-24**。用 JEIDA-24 时纯红/绿/蓝正常，中性灰会偏绿、深灰会偏紫；patch 里已改为 `CONFIG_AIC_LVDS_NS=y` / `CONFIG_AIC_LVDS_MODE=0`。
+> 官方教程和淘宝套件屏默认写的是 JEIDA-24，但本项目实际使用的 **辰源彩晶 7 英寸 1024×600 屏是 VESA-24**。用 JEIDA-24 时纯红/绿/蓝正常，中性灰会偏绿、深灰会偏紫；patch 里已改为 `CONFIG_AIC_LVDS_NS=y` / `CONFIG_AIC_LVDS_MODE=0`。换用官方套件屏时，先确认屏厂规格再决定是否改回 JEIDA，不要直接套用本仓库的 VESA 配置。
+
+## 屏幕与触摸排线（重要）
+
+- **屏幕 FPC 和触摸 FPC 的金手指都必须朝上插入（上接）**，再扣紧连接器锁扣。
+- 插反或下接的典型现象：背光亮但无图像、花屏、触摸无反应。遇到这些先断电检查排线方向，不要先怀疑固件。
+- 插拔前必须断电，避免带电插拔损坏 LVDS 收发器或触摸 IC。
+- 本项目使用 **辰源彩晶 7 英寸 1024×600、40PIN LVDS** 屏；LVDS 映射和时序按这块屏调过。
+- 官方文档/淘宝套件使用的是另一块 7 英寸 1024×600、40PIN、500nit 屏：  
+  <https://e.tb.cn/h.jOqdBqqCDbDXRgD?tk=DvXk6VQDHfi>  
+  商品页关键词：`7寸1024*600液晶触摸屏立创衡山派D133开发板屏40PIN LVDS500亮度`。
+- 两块屏分辨率相同，但 **LVDS 位序/时序可能不同**。如果换官方屏后出现中性灰偏绿/偏紫、颜色不对，按屏厂规格调整 `CONFIG_AIC_LVDS_NS` 和 `CONFIG_AIC_LVDS_MODE`，并核对 `hfp/hbp/hsw/vfp/vbp/vsw`；不要同时套用辰源彩晶的配置。
+- 触摸 IC 当前按 GT911 适配；换屏后如果触摸无反应，先确认触摸 FPC 方向和 I2C 地址，再改驱动配置。
 
 ## 功能
 
@@ -28,6 +40,21 @@
 - 设置：WiFi 名称/密码编辑（底部键盘 + 顶部编辑条）、亮度滑块
 - PE17 软件 PWM 呼吸灯
 - 20px 2bpp Noto Serif SC（GB2312 Level1 + 符号，4586 字符）+ 24px 2bpp 标题子集 + 72px 天气图标
+
+## 直接刷机（普通用户）
+
+不需要编译，直接下载 Release：
+
+<https://github.com/ymyjwbckadnhz/smart-clock-overlay/releases>
+
+下载 `d13x_JLC_v1.0.0.img` 后：
+
+```powershell
+upgcmd.exe -p image d13x_JLC_v1.0.0.img
+upgcmd.exe shcmd reset
+```
+
+需要先让板子进入升级模式，见下面“烧录”一节。
 
 ## 快速开始
 
