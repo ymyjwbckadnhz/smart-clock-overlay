@@ -5,7 +5,7 @@ param(
     [string]$OutDir = ""
 )
 
-$ErrorActionPreference = "Stop"
+$ErrorActionPreference = "Continue"
 $repoRoot = Resolve-Path (Join-Path $PSScriptRoot "..")
 if (-not $OutDir) { $OutDir = Join-Path $repoRoot "dist" }
 
@@ -28,7 +28,9 @@ git -C $SdkDir fetch --all --tags --prune
 if ($LASTEXITCODE -ne 0) { throw "git fetch failed" }
 
 git -C $SdkDir reset --hard
+if ($LASTEXITCODE -ne 0) { throw "git reset failed" }
 git -C $SdkDir clean -fd
+if ($LASTEXITCODE -ne 0) { throw "git clean failed" }
 git -C $SdkDir checkout $BaseCommit
 if ($LASTEXITCODE -ne 0) { throw "git checkout $BaseCommit failed" }
 

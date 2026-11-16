@@ -9,9 +9,6 @@
 
 #include <lvgl.h>
 #include <rtdevice.h>
-#include <dfs_fs.h>
-#include <sys/stat.h>
-#include "lvgl/src/font/lv_binfont_loader.h"
 
 LV_FONT_DECLARE(sc_font_body);
 LV_FONT_DECLARE(sc_font_title);
@@ -19,7 +16,7 @@ LV_FONT_DECLARE(sc_font_icon);
 
 extern int lvgl_thread_init(void);
 
-/* Built-in SimSun fallback; replaced by an SD-card binary font when present */
+/* Built-in 2bpp Noto Serif body font */
 static const lv_font_t *body_font = &sc_font_body;
 
 /* VSCode Dark+ inspired palette */
@@ -74,39 +71,6 @@ static lv_obj_t *set_br_pct, *set_br_slider;
 static char last_news_ts[24] = "";
 static int  last_news_count = -1;
 static int  last_wx_code = -999;
-
-/* Optional SD-card font: /sdcard/font_gb2312.bin */
-static void try_load_sd_font(void)
-{
-    static const char *paths[] = {
-        "L:/sdcard/font_gb2312.bin",
-    };
-    lv_font_t *f = NULL;
-    struct stat st;
-    int i, p;
-
-    /* The kernel's auto-mount often runs before the SD card is ready. */
-    for (i = 0; i < 12; i++) {
-        if (dfs_mount("sd1", "/sdcard", "elm", 0, 0) == 0)
-            break;
-        if (stat("/sdcard/font_gb2312.bin", &st) == 0)
-            break;
-        rt_thread_mdelay(300);
-    }
-
-    rt_kprintf("[SC] SD font load start...\r\n");
-    for (p = 0; p < 1 && !f; p++) {
-        f = lv_binfont_create(paths[p]);
-    }
-    rt_kprintf("[SC] lv_binfont_create=%p\r\n", (void *)f);
-
-    if (f) {
-        body_font = f;
-        rt_kprintf("[SC] SD 2bpp GB2312 font loaded\r\n");
-    } else {
-        rt_kprintf("[SC] SD font not found, fallback SimSun 1bpp\r\n");
-    }
-}
 
 /* ------------------------------------------------------------------ */
 /* helpers                                                            */
@@ -985,9 +949,6 @@ void lv_user_gui_init(void)
     lv_obj_set_style_bg_opa(scr, LV_OPA_COVER, 0);
     lv_obj_set_style_pad_all(scr, 0, 0);
     lv_obj_remove_flag(scr, LV_OBJ_FLAG_SCROLLABLE);
-
-    /* SD binary-font loader is experimental; use the built-in 2bpp C font. */
-    /* try_load_sd_font(); */
 
     build_nav(scr);
     build_status_bar(scr);
