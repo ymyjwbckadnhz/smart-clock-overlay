@@ -167,6 +167,8 @@ application/rt-thread/helloworld/smart_clock/
 首次运行会自动 clone SDK；之后每次重置到 `f5be1e4c`、打 patch、复制应用并编译。
 产物在 `dist/`：`.img`、`SHA256SUMS.txt`。
 
+已在干净的 SDK worktree 上验证：构建成功，镜像 **2,755,584 bytes**。
+
 > self-hosted runner 会执行仓库里的脚本，只把它挂在可信仓库/分支上。
 
 ### Gitee

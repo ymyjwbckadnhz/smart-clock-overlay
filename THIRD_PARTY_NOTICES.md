@@ -36,7 +36,7 @@ the corresponding vendor licenses and do not assume they are open source.
 
 - `font_cjk_16.c`, `font_cjk_20.c`: generated from **Noto Serif SC**
   (SIL Open Font License 1.1), 20px/24px, 2bpp. These can be redistributed under
-  the OFL; keep this notice with the font data.
+  the OFL; see `LICENSES/OFL-1.1.txt` and keep this notice with the font data.
 - `font_icon.c`: generated from **Segoe UI Symbol** (Microsoft). Windows system
   fonts generally do **not** permit redistribution of glyph data. For a public
   release, replace it with an open icon set or confirm the font license first.
