@@ -32,21 +32,14 @@ modifies text files from the upstream SDK.
 These are **not** part of this overlay. If you redistribute the full SDK, check
 the corresponding vendor licenses and do not assume they are open source.
 
-## Fonts and icon glyphs — important
+## Fonts and icon glyphs
 
-The generated C arrays in this repository are bitmap glyph data derived from
-fonts installed on the author's Windows machine:
-
-- `font_cjk_16.c`, `font_cjk_20.c`: **SimSun / 宋体** (Microsoft / Zhongyi)
-- `font_icon.c`: **Segoe UI Symbol** (Microsoft)
-
-Windows system fonts generally do **not** permit redistribution of glyph data.
-Before publishing this repository publicly, do one of the following:
-
-1. Replace them with glyphs generated from an open font, e.g.
-   **Noto Serif CJK SC / 思源宋体** (SIL OFL 1.1), and an open icon set; or
-2. Confirm that your font license allows embedding/redistribution; or
-3. Do not commit the generated font C files and let users generate them locally.
+- `font_cjk_16.c`, `font_cjk_20.c`: generated from **Noto Serif SC**
+  (SIL Open Font License 1.1), 20px/24px, 2bpp. These can be redistributed under
+  the OFL; keep this notice with the font data.
+- `font_icon.c`: generated from **Segoe UI Symbol** (Microsoft). Windows system
+  fonts generally do **not** permit redistribution of glyph data. For a public
+  release, replace it with an open icon set or confirm the font license first.
 
 The rest of the application code can be distributed under Apache-2.0, but that
-does not relicense the SDK, vendor blobs, or font glyph data.
+does not relicense the SDK, vendor blobs, or third-party font/icon glyph data.

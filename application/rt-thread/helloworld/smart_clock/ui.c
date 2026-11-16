@@ -9,12 +9,18 @@
 
 #include <lvgl.h>
 #include <rtdevice.h>
+#include <dfs_fs.h>
+#include <sys/stat.h>
+#include "lvgl/src/font/lv_binfont_loader.h"
 
 LV_FONT_DECLARE(sc_font_body);
 LV_FONT_DECLARE(sc_font_title);
 LV_FONT_DECLARE(sc_font_icon);
 
 extern int lvgl_thread_init(void);
+
+/* Built-in SimSun fallback; replaced by an SD-card binary font when present */
+static const lv_font_t *body_font = &sc_font_body;
 
 /* VSCode Dark+ inspired palette */
 #define C_BG        0x1E1E1E
@@ -69,6 +75,39 @@ static char last_news_ts[24] = "";
 static int  last_news_count = -1;
 static int  last_wx_code = -999;
 
+/* Optional SD-card font: /sdcard/font_gb2312.bin */
+static void try_load_sd_font(void)
+{
+    static const char *paths[] = {
+        "L:/sdcard/font_gb2312.bin",
+    };
+    lv_font_t *f = NULL;
+    struct stat st;
+    int i, p;
+
+    /* The kernel's auto-mount often runs before the SD card is ready. */
+    for (i = 0; i < 12; i++) {
+        if (dfs_mount("sd1", "/sdcard", "elm", 0, 0) == 0)
+            break;
+        if (stat("/sdcard/font_gb2312.bin", &st) == 0)
+            break;
+        rt_thread_mdelay(300);
+    }
+
+    rt_kprintf("[SC] SD font load start...\r\n");
+    for (p = 0; p < 1 && !f; p++) {
+        f = lv_binfont_create(paths[p]);
+    }
+    rt_kprintf("[SC] lv_binfont_create=%p\r\n", (void *)f);
+
+    if (f) {
+        body_font = f;
+        rt_kprintf("[SC] SD 2bpp GB2312 font loaded\r\n");
+    } else {
+        rt_kprintf("[SC] SD font not found, fallback SimSun 1bpp\r\n");
+    }
+}
+
 /* ------------------------------------------------------------------ */
 /* helpers                                                            */
 /* ------------------------------------------------------------------ */
@@ -114,7 +153,7 @@ static lv_obj_t *mk_button(lv_obj_t *parent, int x, int y, int w, int h,
                            const char *text, lv_event_cb_t cb, void *user)
 {
     lv_obj_t *b = mk_obj(parent, x, y, w, h, C_CARD_ACT, 14);
-    lv_obj_t *l = mk_label(b, text, &sc_font_body, C_TEXT, 0, (h - 24) / 2);
+    lv_obj_t *l = mk_label(b, text, body_font, C_TEXT, 0, (h - 24) / 2);
 
     lv_obj_set_width(l, w);
     lv_obj_set_style_text_align(l, LV_TEXT_ALIGN_CENTER, 0);
@@ -153,7 +192,7 @@ static void fmt_signed(char *out, int v)
 static void page_title(lv_obj_t *parent, const char *title, const char *sub)
 {
     mk_label(parent, title, &sc_font_title, C_TEXT, 28, 14);
-    mk_label(parent, sub, &sc_font_body, C_MUTED, 28, 44);
+    mk_label(parent, sub, body_font, C_MUTED, 28, 44);
     mk_obj(parent, 28, 76, 864, 1, C_LINE, 0);
 }
 
@@ -207,7 +246,7 @@ static void build_nav(lv_obj_t *scr)
         lv_obj_set_width(nav_icon[i], 88);
         lv_obj_set_style_text_align(nav_icon[i], LV_TEXT_ALIGN_CENTER, 0);
 
-        nav_lbl[i] = mk_label(b, nav_names[i], &sc_font_body, C_MUTED, 0, 44);
+        nav_lbl[i] = mk_label(b, nav_names[i], body_font, C_MUTED, 0, 44);
         lv_obj_set_width(nav_lbl[i], 88);
         lv_obj_set_style_text_align(nav_lbl[i], LV_TEXT_ALIGN_CENTER, 0);
 
@@ -229,27 +268,27 @@ static void build_clock(lv_obj_t *tile)
     lv_obj_set_width(clk_time, 440);
 
     clk_date = mk_label(tile, "----年--月--日", &sc_font_title, C_TEXT, 520, 122);
-    clk_week = mk_label(tile, "星期--", &sc_font_body, C_MUTED, 520, 162);
+    clk_week = mk_label(tile, "星期--", body_font, C_MUTED, 520, 162);
 
     mk_obj(tile, 492, 118, 1, 86, C_LINE, 0);
 
     c1 = mk_card(tile, 28, 280, 272, 150);
-    mk_label(c1, "网络", &sc_font_body, C_MUTED, 20, 16);
-    clk_net = mk_label(c1, "正在连接 ...", &sc_font_body, C_TEXT, 20, 50);
+    mk_label(c1, "网络", body_font, C_MUTED, 20, 16);
+    clk_net = mk_label(c1, "正在连接 ...", body_font, C_TEXT, 20, 50);
     lv_obj_set_width(clk_net, 232);
     lv_label_set_long_mode(clk_net, LV_LABEL_LONG_WRAP);
 
     c2 = mk_card(tile, 318, 280, 272, 150);
-    mk_label(c2, "授时", &sc_font_body, C_MUTED, 20, 16);
-    clk_ntp = mk_label(c2, "等待 NTP ...", &sc_font_body, C_TEXT, 20, 50);
+    mk_label(c2, "授时", body_font, C_MUTED, 20, 16);
+    clk_ntp = mk_label(c2, "等待 NTP ...", body_font, C_TEXT, 20, 50);
     lv_obj_set_width(clk_ntp, 232);
     lv_label_set_long_mode(clk_ntp, LV_LABEL_LONG_WRAP);
 
     c3 = mk_card(tile, 608, 280, 284, 150);
-    mk_label(c3, "时区", &sc_font_body, C_MUTED, 20, 16);
-    mk_label(c3, "Asia/Shanghai\nUTC+08:00", &sc_font_body, C_TEXT, 20, 50);
+    mk_label(c3, "时区", body_font, C_MUTED, 20, 16);
+    mk_label(c3, "Asia/Shanghai\nUTC+08:00", body_font, C_TEXT, 20, 50);
 
-    mk_label(tile, "时间由 ntp.aliyun.com 自动校准，每 10 分钟刷新", &sc_font_body,
+    mk_label(tile, "时间由 ntp.aliyun.com 自动校准，每 10 分钟刷新", body_font,
              C_MUTED, 28, 468);
 }
 
@@ -295,15 +334,15 @@ static void build_weather(lv_obj_t *tile)
 
     page_title(tile, "天气", "本地天气 · Open-Meteo");
 
-    wx_updated = mk_label(tile, "更新 --:--", &sc_font_body, C_MUTED, 700, 18);
+    wx_updated = mk_label(tile, "更新 --:--", body_font, C_MUTED, 700, 18);
     lv_obj_set_width(wx_updated, 192);
     lv_obj_set_style_text_align(wx_updated, LV_TEXT_ALIGN_RIGHT, 0);
 
-    wx_city = mk_label(tile, "定位中 ...", &sc_font_body, C_TEXT, 28, 92);
+    wx_city = mk_label(tile, "定位中 ...", body_font, C_TEXT, 28, 92);
     wx_temp = mk_label(tile, "--°", &lv_font_montserrat_48, C_ACCENT, 28, 124);
-    wx_text = mk_label(tile, "---", &sc_font_body, C_TEXT, 220, 150);
+    wx_text = mk_label(tile, "---", body_font, C_TEXT, 220, 150);
     wx_detail = mk_label(tile, "体感 --° · 湿度 --% · 风速 -- km/h",
-                         &sc_font_body, C_MUTED, 28, 206);
+                         body_font, C_MUTED, 28, 206);
 
     wx_icon = mk_label(tile, "☁", &sc_font_icon, 0xD4D4D4, 300, 82);
     lv_obj_set_width(wx_icon, 120);
@@ -313,11 +352,11 @@ static void build_weather(lv_obj_t *tile)
         lv_obj_t *c = mk_card(tile, 28 + i * 216, 300, 200, 158);
 
         wx_day_name[i] = mk_label(c, i == 0 ? "今天" : "---", &sc_font_title, C_TEXT, 18, 14);
-        wx_day_text[i] = mk_label(c, "---", &sc_font_body, C_MUTED, 18, 54);
+        wx_day_text[i] = mk_label(c, "---", body_font, C_MUTED, 18, 54);
         wx_day_range[i] = mk_label(c, "--°/--°", &sc_font_title, C_TEXT, 18, 94);
     }
 
-    mk_label(tile, "数据来源 Open-Meteo，每 10 分钟刷新", &sc_font_body, C_MUTED, 28, 480);
+    mk_label(tile, "数据来源 Open-Meteo，每 10 分钟刷新", body_font, C_MUTED, 28, 480);
 }
 
 /* ------------------------------------------------------------------ */
@@ -330,11 +369,11 @@ static void build_news(lv_obj_t *tile)
 
     page_title(tile, "科技热点", "IT之家滚动新闻 · 自动刷新");
 
-    news_updated = mk_label(tile, "更新 --:--", &sc_font_body, C_MUTED, 700, 18);
+    news_updated = mk_label(tile, "更新 --:--", body_font, C_MUTED, 700, 18);
     lv_obj_set_width(news_updated, 192);
     lv_obj_set_style_text_align(news_updated, LV_TEXT_ALIGN_RIGHT, 0);
 
-    news_hint = mk_label(tile, "正在获取新闻 ...", &sc_font_body, C_MUTED, 28, 96);
+    news_hint = mk_label(tile, "正在获取新闻 ...", body_font, C_MUTED, 28, 96);
 
     for (i = 0; i < 8; i++) {
         int y = 90 + i * 54;
@@ -343,7 +382,7 @@ static void build_news(lv_obj_t *tile)
         lv_obj_set_width(news_idx[i], 26);
         lv_obj_set_style_text_align(news_idx[i], LV_TEXT_ALIGN_CENTER, 0);
 
-        news_title[i] = mk_label(tile, "", &sc_font_body, C_TEXT, 66, y + 12);
+        news_title[i] = mk_label(tile, "", body_font, C_TEXT, 66, y + 12);
         lv_obj_set_width(news_title[i], 800);
         lv_label_set_long_mode(news_title[i], LV_LABEL_LONG_DOT);
         lv_obj_add_flag(news_title[i], LV_OBJ_FLAG_HIDDEN);
@@ -368,9 +407,9 @@ static void build_stocks(lv_obj_t *tile)
         int y = 90 + (i / 4) * 212;
         lv_obj_t *c = mk_card(tile, x, y, 206, 192);
 
-        stk_name[i] = mk_label(c, "---", &sc_font_body, C_MUTED, 14, 12);
+        stk_name[i] = mk_label(c, "---", body_font, C_MUTED, 14, 12);
         stk_price[i] = mk_label(c, "----.--", &lv_font_montserrat_28, C_TEXT, 12, 48);
-        stk_chg[i] = mk_label(c, "--", &sc_font_body, C_MUTED, 14, 130);
+        stk_chg[i] = mk_label(c, "--", body_font, C_MUTED, 14, 130);
 
         mk_obj(c, 14, 168, 178, 1, C_LINE, 0);
     }
@@ -518,7 +557,7 @@ static void kb_open(lv_obj_t *ta)
     lv_obj_set_style_border_color(edit, lv_color_hex(C_ACCENT), 0);
     lv_obj_set_style_radius(edit, 8, 0);
     lv_obj_set_style_text_color(edit, lv_color_hex(C_TEXT), 0);
-    lv_obj_set_style_text_font(edit, &sc_font_body, 0);
+    lv_obj_set_style_text_font(edit, body_font, 0);
     lv_obj_set_style_pad_all(edit, 8, 0);
     input_cursor_style(edit);
     kb_edit = edit;
@@ -582,7 +621,7 @@ static void style_textarea(lv_obj_t *ta)
     lv_obj_set_style_border_color(ta, lv_color_hex(C_LINE), 0);
     lv_obj_set_style_radius(ta, 10, 0);
     lv_obj_set_style_text_color(ta, lv_color_hex(C_TEXT), 0);
-    lv_obj_set_style_text_font(ta, &sc_font_body, 0);
+    lv_obj_set_style_text_font(ta, body_font, 0);
     lv_obj_set_style_pad_all(ta, 8, 0);
     input_cursor_hide(ta);
     /* only the edit bar above the keyboard may own the cursor */
@@ -603,10 +642,10 @@ static void build_settings(lv_obj_t *tile)
 
     wifi = mk_card(tile, 28, 90, 864, 232);
 
-    set_status = mk_label(wifi, "WiFi 连接中 ...", &sc_font_body, C_MUTED, 20, 14);
+    set_status = mk_label(wifi, "WiFi 连接中 ...", body_font, C_MUTED, 20, 14);
     lv_obj_set_width(set_status, 824);
 
-    mk_label(wifi, "名称", &sc_font_body, C_TEXT, 20, 64);
+    mk_label(wifi, "名称", body_font, C_TEXT, 20, 64);
     ta = lv_textarea_create(wifi);
     ta_ssid = ta;
     lv_obj_set_pos(ta, 100, 54);
@@ -615,7 +654,7 @@ static void build_settings(lv_obj_t *tile)
     lv_textarea_set_text(ta, g_sc.wifi_ssid[0] ? g_sc.wifi_ssid : "");
     style_textarea(ta);
 
-    mk_label(wifi, "密码", &sc_font_body, C_TEXT, 20, 126);
+    mk_label(wifi, "密码", body_font, C_TEXT, 20, 126);
     ta = lv_textarea_create(wifi);
     ta_pass = ta;
     lv_obj_set_pos(ta, 100, 116);
@@ -630,11 +669,11 @@ static void build_settings(lv_obj_t *tile)
 
     mk_button(wifi, 520, 54, 130, 54, "连接", settings_connect_cb, NULL);
     mk_label(wifi, "修改 WiFi 后点“连接”，配置会写入 Flash，重启后保持",
-             &sc_font_body, C_MUTED, 20, 186);
+             body_font, C_MUTED, 20, 186);
 
     bright = mk_card(tile, 28, 338, 864, 164);
 
-    mk_label(bright, "亮度", &sc_font_body, C_TEXT, 20, 16);
+    mk_label(bright, "亮度", body_font, C_TEXT, 20, 16);
     set_br_pct = mk_label(bright, "80%", &lv_font_montserrat_28, C_ACCENT, 700, 10);
     lv_obj_set_width(set_br_pct, 140);
     lv_obj_set_style_text_align(set_br_pct, LV_TEXT_ALIGN_RIGHT, 0);
@@ -697,8 +736,8 @@ static void build_status_bar(lv_obj_t *scr)
 {
     lv_obj_t *bar = mk_obj(scr, 104, 0, 920, 52, C_BG, 0);
 
-    sb_wifi = mk_label(bar, "WiFi 连接中 ...", &sc_font_body, C_MUTED, 24, 14);
-    sb_ntp = mk_label(bar, "NTP 等待", &sc_font_body, C_MUTED, 460, 14);
+    sb_wifi = mk_label(bar, "WiFi 连接中 ...", body_font, C_MUTED, 24, 14);
+    sb_ntp = mk_label(bar, "NTP 等待", body_font, C_MUTED, 460, 14);
     sb_time = mk_label(bar, "--:--", &lv_font_montserrat_24, C_TEXT, 790, 10);
     lv_obj_set_width(sb_time, 104);
     lv_obj_set_style_text_align(sb_time, LV_TEXT_ALIGN_RIGHT, 0);
@@ -947,6 +986,9 @@ void lv_user_gui_init(void)
     lv_obj_set_style_pad_all(scr, 0, 0);
     lv_obj_remove_flag(scr, LV_OBJ_FLAG_SCROLLABLE);
 
+    /* SD binary-font loader is experimental; use the built-in 2bpp C font. */
+    /* try_load_sd_font(); */
+
     build_nav(scr);
     build_status_bar(scr);
     build_pages();
@@ -980,3 +1022,4 @@ static void sc_bright_cmd(int argc, char **argv)
     rt_kprintf("brightness -> %d%%\n", v);
 }
 MSH_CMD_EXPORT(sc_bright_cmd, set backlight brightness 5..100);
+

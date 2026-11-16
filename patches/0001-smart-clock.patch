@@ -82,10 +82,10 @@ index c1743c61..d6d6faf5 100644
  
  Return('group')
 diff --git a/packages/artinchip/lvgl-ui/lvgl_v9/lv_conf.h b/packages/artinchip/lvgl-ui/lvgl_v9/lv_conf.h
-index 5e98350e..ff8fd516 100644
+index 5e98350e..e8848275 100644
 --- a/packages/artinchip/lvgl-ui/lvgl_v9/lv_conf.h
 +++ b/packages/artinchip/lvgl-ui/lvgl_v9/lv_conf.h
-@@ -90,6 +90,17 @@
+@@ -90,6 +90,23 @@
  #define LV_FONT_MONTSERRAT_16       1
  #endif /* LV_USE_DEMO_MUSIC */
  
@@ -99,6 +99,12 @@ index 5e98350e..ff8fd516 100644
 +#ifndef LV_FONT_MONTSERRAT_48
 +#define LV_FONT_MONTSERRAT_48 1
 +#endif
++
++/* SD-card binary font may contain more than 64K glyph data */
++#define LV_FONT_FMT_TXT_LARGE 1
++
++
++
 +
  /*FreeType library*/
  #define LV_USE_FREETYPE 0

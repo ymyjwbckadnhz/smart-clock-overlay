@@ -15,6 +15,9 @@
 #include <lwip/dhcp.h>
 #include <lwip/ip_addr.h>
 
+#include <fcntl.h>
+#include <unistd.h>
+
 #include <wifi/wifi_conf.h>
 #include <cJSON.h>
 #include <rtdevice.h>
@@ -256,6 +259,137 @@ static int http_get(const char *host, const char *path, int timeout_ms)
     body[http_body_len] = 0;
     http_body = body;
     return 0;
+}
+
+/* Download an HTTP URL to a local file (used for the SD-card font). */
+static int http_download(const char *url, const char *file)
+{
+    const char *p, *slash;
+    char *colon;
+    char host[64], req[320], hdr[1024];
+    const char *path;
+    ip_addr_t ip;
+    struct sockaddr_in sa;
+    struct timeval tv;
+    int port = 80, s, n, hlen = 0, code = 0, content_len = -1;
+    int fd = -1, total = 0, ret = -1;
+
+    p = strstr(url, "://");
+    if (!p)
+        return -1;
+    p += 3;
+    slash = strchr(p, '/');
+    if (!slash)
+        return -1;
+
+    if ((size_t)(slash - p) >= sizeof(host))
+        return -1;
+    memcpy(host, p, slash - p);
+    host[slash - p] = 0;
+    path = slash;
+
+    colon = strchr(host, ':');
+    if (colon) {
+        *colon = 0;
+        port = atoi(colon + 1);
+    }
+
+    if (resolve_host(host, &ip) != 0) {
+        rt_kprintf(SC_TAG "SD download: DNS failed %s\r\n", host);
+        return -1;
+    }
+
+    s = socket(AF_INET, SOCK_STREAM, 0);
+    if (s < 0)
+        return -1;
+
+    tv.tv_sec = 20;
+    tv.tv_usec = 0;
+    setsockopt(s, SOL_SOCKET, SO_RCVTIMEO, &tv, sizeof(tv));
+    setsockopt(s, SOL_SOCKET, SO_SNDTIMEO, &tv, sizeof(tv));
+
+    memset(&sa, 0, sizeof(sa));
+    sa.sin_family = AF_INET;
+    sa.sin_port = htons(port);
+    sa.sin_addr.s_addr = ip4_addr_get_u32(ip_2_ip4(&ip));
+
+    if (connect(s, (struct sockaddr *)&sa, sizeof(sa)) < 0) {
+        closesocket(s);
+        return -1;
+    }
+
+    n = snprintf(req, sizeof(req),
+                 "GET %s HTTP/1.1\r\n"
+                 "Host: %s\r\n"
+                 "User-Agent: SmartClock/1.0\r\n"
+                 "Connection: close\r\n\r\n",
+                 path, host);
+    if (send(s, req, n, 0) != n) {
+        closesocket(s);
+        return -1;
+    }
+
+    while (hlen < (int)sizeof(hdr) - 1) {
+        n = recv(s, hdr + hlen, 1, 0);
+        if (n <= 0)
+            goto out;
+        hlen++;
+        if (hlen >= 4 && memcmp(hdr + hlen - 4, "\r\n\r\n", 4) == 0)
+            break;
+    }
+    hdr[hlen] = 0;
+
+    p = strchr(hdr, ' ');
+    if (!p)
+        goto out;
+    code = atoi(p + 1);
+    if (code != 200) {
+        rt_kprintf(SC_TAG "SD download: HTTP %d\r\n", code);
+        goto out;
+    }
+
+    p = ci_find(hdr, "content-length:");
+    if (p)
+        content_len = atoi(p + 15);
+
+    fd = open(file, O_WRONLY | O_CREAT | O_TRUNC, 0666);
+    if (fd < 0) {
+        rt_kprintf(SC_TAG "SD download: open %s failed\r\n", file);
+        goto out;
+    }
+
+    for (;;) {
+        int off = 0;
+
+        n = recv(s, http_buf, sizeof(http_buf), 0);
+        if (n <= 0)
+            break;
+        while (off < n) {
+            int w = write(fd, http_buf + off, n - off);
+
+            if (w <= 0) {
+                rt_kprintf(SC_TAG "SD download: write failed\r\n");
+                goto out;
+            }
+            off += w;
+        }
+        total += n;
+        if (content_len > 0 && total >= content_len)
+            break;
+    }
+
+    if (content_len > 0 && total != content_len) {
+        rt_kprintf(SC_TAG "SD download: short %d/%d\r\n", total, content_len);
+        goto out;
+    }
+    ret = 0;
+    rt_kprintf(SC_TAG "SD download: %d bytes -> %s\r\n", total, file);
+
+out:
+    if (fd >= 0)
+        close(fd);
+    closesocket(s);
+    return ret;
 }
 
 /* ------------------------------------------------------------------ */
@@ -937,4 +1071,19 @@ static void sc_news_test(int argc, char **argv)
         rt_kprintf("body: %.200s\n", http_body);
 }
 MSH_CMD_EXPORT(sc_news_test, force fetch ITHome news and print result);
+
+static void sc_sd_get(int argc, char **argv)
+{
+    if (argc != 3) {
+        rt_kprintf("usage: sc_sd_get <http_url> <sd_path>\n");
+        rt_kprintf("  e.g. sc_sd_get http://192.168.1.10:8000/font.bin "
+                   "/sdcard/font_cjk_20_2bpp.bin\n");
+        return;
+    }
+    if (http_download(argv[1], argv[2]) == 0)
+        rt_kprintf("download ok\n");
+    else
+        rt_kprintf("download failed\n");
+}
+MSH_CMD_EXPORT(sc_sd_get, download a file from HTTP to SD card);
 

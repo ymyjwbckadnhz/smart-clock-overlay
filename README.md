@@ -27,7 +27,7 @@
 - 股指：上证/深证/创业板/沪深300 + 道琼斯/纳斯达克/标普500/纳指100
 - 设置：WiFi 名称/密码编辑（底部键盘 + 顶部编辑条）、亮度滑块
 - PE17 软件 PWM 呼吸灯
-- 20px GBK 宋体（21886 字符）+ 24px 标题子集 + 72px 天气图标
+- 20px 2bpp Noto Serif SC（GB2312 Level1 + 符号，4586 字符）+ 24px 2bpp 标题子集 + 72px 天气图标
 
 ## 快速开始
 
@@ -124,7 +124,7 @@ upgcmd.exe shcmd reset
 - `CONFIG_AIC_USING_FS_IMAGE_0/1` 关闭
 - `CONFIG_AIC_GE_DITHER` 关闭
 - HTTP 缓冲 32 KB（IT 之家 JSON 约 24 KB，原 24 KB 缓冲会截断）
-- 20px 宋体覆盖 GBK 21886 字符
+- 20px Noto Serif SC 2bpp 覆盖 GB2312 Level1、符号区与“叒/叕”等扩展，共 4586 字；24px 为 UI 子集。固件约 2.76 MB，仍在 3 MB os 分区内。
 
 ## 目录
 
@@ -133,8 +133,8 @@ application/rt-thread/helloworld/smart_clock/
 ├── net.c          WiFi/DNS/SNTP/HTTP/cJSON/行情/配置持久化
 ├── ui.c           五页 UI/键盘/亮度/定时刷新
 ├── smart_clock.h  共享数据与锁
-├── font_cjk_16.c  20px 1bpp 宋体（GBK）
-├── font_cjk_20.c  24px 1bpp 宋体（UI 子集）
+├── font_cjk_16.c  20px 2bpp Noto Serif SC（GB2312 Level1 + 符号，4586 字）
+├── font_cjk_20.c  24px 2bpp Noto Serif SC（UI 子集）
 ├── font_icon.c    72px 4bpp 天气图标
 ├── README.md      应用层详细说明
 └── SConscript
@@ -192,7 +192,7 @@ $env:SDK_DIR = "C:\d13x-sdk"
 
 ## 字体与许可证提醒
 
-- 本仓库的 `font_cjk_16.c` / `font_cjk_20.c` 由 **Windows 宋体（SimSun）** 生成，`font_icon.c` 由 **Segoe UI Symbol** 生成。Windows 字体通常不允许再分发字形数据；如果要公开仓库，建议用 **Noto Serif CJK / 思源宋体** 和开源图标集重新生成，或先确认字体授权。
+- 本仓库的 `font_cjk_16.c` / `font_cjk_20.c` 由 **Noto Serif SC（SIL OFL 1.1）** 生成，可随仓库分发。`font_icon.c` 仍由 **Segoe UI Symbol** 生成，公开前建议换开源图标集，或确认授权。
 - 上游 SDK 的第三方组件（RT-Thread、LVGL、lwIP、cJSON、Realtek 固件、ArtInChip 二进制等）保留各自许可证；本仓库只提供应用层和文本 patch，不包含这些二进制。
 - 你自己的应用代码可按 Apache-2.0 发布；不要重新许可上游组件。
 

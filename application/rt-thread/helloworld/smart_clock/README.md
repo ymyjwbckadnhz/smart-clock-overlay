@@ -20,7 +20,7 @@
 
 ## 网络
 
-- WiFi STA 默认使用占位符 `YOUR_WIFI_SSID` / `YOUR_WIFI_PASSWORD`，首次使用请在设置页填写实际账号密码并点“连接”，配置会写入 Flash。
+- WiFi STA 默认 `OvO` / `00000000`，开机自动连接；可在设置页修改并持久化。
 - 连接后手动设置 DNS（223.5.5.5 / 119.29.29.29），因为热点 DHCP 未下发 DNS。
 - NTP 同步后同时设置 RT-Thread RTC。
 - 刷新周期：股指 60 s，天气/新闻 10 min，NTP 仅开机（失败重试；新闻失败 5 min 退避）。
@@ -41,8 +41,8 @@ smart_clock/
 ├── net.c          WiFi、DNS、SNTP、HTTP、cJSON、行情解析、后台线程、WiFi 配置读写
 ├── ui.c           五个页面、导航、状态栏、键盘弹层、PWM 亮度、定时刷新
 ├── smart_clock.h  共享数据结构与互斥锁
-├── font_cjk_16.c  20px 1bpp 宋体（GBK 21886 字符）
-├── font_cjk_20.c  24px 1bpp 宋体（UI 固定字符子集）
+├── font_cjk_16.c  20px 2bpp Noto Serif SC（GB2312 Level1 + 符号，4586 字符）
+├── font_cjk_20.c  24px 2bpp Noto Serif SC（UI 固定字符子集）
 ├── font_icon.c    72px 4bpp Segoe UI Symbol 天气图标
 └── SConscript
 ```
@@ -69,7 +69,7 @@ scons -j8
 
 ## 字体与配色
 
-- 字体为 1bpp 点阵宋体，完全不抗锯齿，因此没有灰色过渡像素；20px 覆盖 GBK 21886 个字符（含“叒/叕”等生僻字），24px 为 UI 字符子集。
+- 字体为 2bpp 灰阶抗锯齿的 Noto Serif SC（SIL OFL）：20px 覆盖 GB2312 Level1、GB2312 符号区及“叒/叕”等扩展，共 4586 字；24px 为 UI 字符子集。固件约 2.76 MB，仍在 3 MB os 分区内。
 - 配色采用 VSCode Dark+：背景 `#1E1E1E`、卡片/侧栏 `#252526`、次要文字 `#858585`、正文 `#D4D4D4`、强调蓝 `#569CD6`；仅股指沿用红涨绿跌。
 - 天气图标为 Segoe UI Symbol 的 ☀ / ⛅ / ☁ / ☔ / ❄ / ⚡ / 🌫 单色字形。
 
