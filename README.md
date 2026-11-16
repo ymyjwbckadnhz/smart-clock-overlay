@@ -115,6 +115,107 @@ upgcmd.exe -p image output/d13x_JLC_rt-thread_helloworld/images/d13x_JLC_v1.0.0.
 upgcmd.exe shcmd reset
 ```
 
+## 测试方法
+
+当前 CI 只做**编译 + 产物检查**，实机验证按下面的手工清单执行；自动 HIL 暂未接入。
+
+### 1. 构建检查
+
+```bash
+scons --apply-def=d13x_JLC_rt-thread_helloworld_defconfig
+scons -j8
+```
+
+通过标准：
+
+- `Luban-Lite is built successfully`
+- 生成 `output/d13x_JLC_rt-thread_helloworld/images/d13x_JLC_v1.0.0.img`
+- 镜像小于 3 MB（当前约 2.76 MB），不能超过 os 分区
+- 无 `undefined reference`、无链接溢出
+
+### 2. 烧录
+
+正常 USB 升级：
+
+```bash
+upgcmd.exe -p image output/d13x_JLC_rt-thread_helloworld/images/d13x_JLC_v1.0.0.img
+upgcmd.exe shcmd reset
+```
+
+进入 BROM 的两种方式：
+
+- 按住 **UBOOT** 再按 **RESET**
+- 如果接了 ESP8266 自动下载电路：`DTR=1, RTS=0` 进 BROM，`DTR=0, RTS=1` 正常复位
+
+> 烧录前确认 `upgcmd.exe -l` 能看到设备；不要在 download 模式拔电。
+
+### 3. 串口基线
+
+串口 **115200 8N1**，上电后应能看到：
+
+```text
+Welcome to ArtInChip Luban-Lite 1.1.0 [D13x Inside]
+Image version: 1.0.0
+```
+
+进入 shell 后执行：
+
+```text
+sc_status
+free
+```
+
+通过标准：
+
+- `wifi=1`、`ntp=1`
+- `weather=1`
+- `news=1 count=8`
+- `stock=1`，8 行指数都有数值
+- `free` 的 `heap_sys available size` 大于 100 KB（当前约 760 KB）
+
+### 4. 五页功能清单
+
+| 页面 | 检查项 | 通过标准 |
+|---|---|---|
+| 时钟 | 时间、日期、星期、NTP 状态 | 时间正确，10 分钟内不跳变；断网后仍走时 |
+| 天气 | 城市、当前温度、天气现象、4 天预报、图标 | 上海/城市名正确；温度合理；图标不是方块 |
+| 新闻 | 8 条标题、时间、滚动、触摸 | 8 条都有内容；中文/标点无方块；可滚动 |
+| 股指 | 上证/深证/创业板/沪深300 + 道指/纳指/标普/纳指100 | 8 行都有数值；涨绿跌红；无 `--` |
+| 设置 | WiFi 名称/密码、键盘、亮度滑条、PE17 | 能连接新 WiFi；密码有遮挡；亮度 5–100 可调；LED 呼吸 |
+
+补充检查：
+
+- 底部键盘不遮挡输入区，光标只在键盘上方编辑栏
+- 切换页面无花屏、无残影、无卡死
+- 触摸五个导航按钮和键盘按键都准确
+- 重启后 WiFi、亮度设置仍保留
+
+### 5. 稳定性
+
+- 连续运行 **30 分钟**：新闻/天气/股指至少各刷新一次，无重启
+- 连续运行 **2 小时**：`free` 的 available size 不明显持续下降
+- 反复切换五页 50 次：无卡死、无内存耗尽
+- 断网 5 分钟后恢复：WiFi 重连、NTP/数据恢复
+
+### 6. 失败时抓什么
+
+- 完整串口日志（从 `Pre-Boot Program` 到出错点）
+- `sc_status`、`free` 输出
+- 镜像文件名/大小、烧录时间
+- 屏幕照片（花屏/方块/布局问题时）
+- 是否插了 TF 卡、WiFi SSID、大致网络环境
+
+### 7. 外部服务说明
+
+天气/新闻/股票依赖公网，以下情况先排除网络，不要直接判固件故障：
+
+- `wifi=0`：WiFi 配置/路由器/信号
+- `weather=0`：Open-Meteo 不可达或 DNS 失败
+- `news=0`：IT 之家接口超时/限流（可 `sc_news_test` 单独重试）
+- `stock=0`：腾讯行情接口超时
+
+启动、WiFi、NTP、内存、触摸、显示属于**硬性通过项**；外部数据失败要记录并重试，不能掩盖启动类问题。
+
 ## 关键配置
 
 - LVDS：`CONFIG_AIC_LVDS_NS=y`、`CONFIG_AIC_LVDS_MODE=0`（VESA-24）
