@@ -165,7 +165,7 @@ application/rt-thread/helloworld/smart_clock/
 5. 工作流：`.github/workflows/build.yml`；构建脚本：`.ci/build.ps1`。
 
 首次运行会自动 clone SDK；之后每次重置到 `f5be1e4c`、打 patch、复制应用并编译。
-产物在 `dist/`：`.img`、`SHA256SUMS.txt`（如果 `sd/` 存在，也会带上字库 `.bin`）。
+产物在 `dist/`：`.img`、`SHA256SUMS.txt`。
 
 > self-hosted runner 会执行仓库里的脚本，只把它挂在可信仓库/分支上。
 
