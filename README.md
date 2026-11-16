@@ -157,7 +157,7 @@ application/rt-thread/helloworld/smart_clock/
    - `scons`
    - 对应 Python 2.7 环境
    - `riscv64-unknown-elf-gcc`
-4. push 到 `main` / PR 会构建并上传 artifact；push `v*` tag 会创建 GitHub Release：
+4. push 到 `main` 会构建并上传 artifact；push `v*` tag 会创建 GitHub Release：
    ```bash
    git tag -a v1.0.0 -m "Smart Clock v1.0.0"
    git push origin v1.0.0
