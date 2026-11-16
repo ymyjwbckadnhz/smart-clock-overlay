@@ -1,0 +1,255 @@
+diff --git a/application/rt-thread/helloworld/user_led/user_led.c b/application/rt-thread/helloworld/user_led/user_led.c
+index 362ea37d..32d51f60 100644
+--- a/application/rt-thread/helloworld/user_led/user_led.c
++++ b/application/rt-thread/helloworld/user_led/user_led.c
+@@ -16,25 +16,41 @@
+ #include <rtthread.h>
+ #include "rtdevice.h"
+ #include "aic_core.h"
++#include "aic_osal.h"
+ #include "aic_hal_gpio.h"
+ 
+ #define THREAD_PRIORITY         25     // 线程优先级，数字越大优先级越高
+-#define THREAD_STACK_SIZE       512    // 线程堆栈大小，决定了线程可以使用的内存空间
++#define THREAD_STACK_SIZE       2048   // 线程堆栈大小
+ #define THREAD_TIMESLICE        5      // 线程时间片，决定了线程在调度时能占用CPU的最长时间
+ 
+ static rt_thread_t led_thread = RT_NULL; // 声明线程控制块指针，用于后续创建和管理线程
+ static rt_base_t user_led_pin = RT_NULL; // 声明引脚编号变量，初始化为NULL，用于存储LED的引脚编号
+ 
+-// 线程入口函数，这是线程启动后执行的函数
++/*
++ * Software PWM breathing light on PE17.
++ * 100 Hz carrier (20 ms), duty 0..100 % stepped by 2 %.
++ */
++static void user_led_pwm(int duty)
++{
++    if (duty > 0) {
++        rt_pin_write(user_led_pin, PIN_HIGH);
++        aicos_udelay(duty * 200);
++    }
++    rt_pin_write(user_led_pin, PIN_LOW);
++    if (duty < 100)
++        aicos_udelay((100 - duty) * 200);
++}
++
+ static void user_led_thread_entry(void *param)
+ {
+-    while(1) // 无限循环，使线程持续运行
+-    {
+-        rt_pin_write(user_led_pin, PIN_HIGH); // 将LED引脚电平设置为高
+-        rt_thread_mdelay(100); // 线程延时100毫秒，让LED保持高电平一段时间
++    int duty;
+ 
+-        rt_pin_write(user_led_pin, PIN_LOW); // 将LED引脚电平设置为低
+-        rt_thread_mdelay(100); // 线程延时100毫秒，让LED保持低电平一段时间
++    (void)param;
++    while (1) {
++        for (duty = 0; duty <= 100; duty += 2)
++            user_led_pwm(duty);
++        for (duty = 100; duty >= 0; duty -= 2)
++            user_led_pwm(duty);
+     }
+ }
+ 
+diff --git a/packages/artinchip/lvgl-ui/SConscript b/packages/artinchip/lvgl-ui/SConscript
+index e314eabb..6d30f53c 100644
+--- a/packages/artinchip/lvgl-ui/SConscript
++++ b/packages/artinchip/lvgl-ui/SConscript
+@@ -3,7 +3,11 @@ import os
+ 
+ cwd = GetCurrentDir()
+ group = []
+-src = Glob('*.c')
++# aic_ui.c / lv_demo.c belong to the built-in demo framework and must only be
++# built when the demo framework is enabled, otherwise they conflict with the
++# application provided lv_user_gui_init().
++src = [f for f in Glob('*.c')
++       if os.path.basename(str(f)) not in ('aic_ui.c', 'lv_demo.c')]
+ 
+ if GetDepend(['AIC_LVGL_DEMO']):
+     src += Glob('./aic_ui.c')
+diff --git a/packages/artinchip/lvgl-ui/aic_drivers/SConscript b/packages/artinchip/lvgl-ui/aic_drivers/SConscript
+index c1743c61..d6d6faf5 100644
+--- a/packages/artinchip/lvgl-ui/aic_drivers/SConscript
++++ b/packages/artinchip/lvgl-ui/aic_drivers/SConscript
+@@ -12,6 +12,6 @@ for d in list:
+     if os.path.isfile(os.path.join(path, 'SConscript')):
+         group = group + SConscript(os.path.join(d, 'SConscript'))
+ 
+-group = group + DefineGroup('LVGL-port', src, depend = ['LPKG_USING_LVGL', 'AIC_LVGL_DEMO'], CPPPATH = CPPPATH)
++group = group + DefineGroup('LVGL-port', src, depend = ['LPKG_USING_LVGL'], CPPPATH = CPPPATH)
+ 
+ Return('group')
+diff --git a/packages/artinchip/lvgl-ui/lvgl_v9/lv_conf.h b/packages/artinchip/lvgl-ui/lvgl_v9/lv_conf.h
+index 5e98350e..ff8fd516 100644
+--- a/packages/artinchip/lvgl-ui/lvgl_v9/lv_conf.h
++++ b/packages/artinchip/lvgl-ui/lvgl_v9/lv_conf.h
+@@ -90,6 +90,17 @@
+ #define LV_FONT_MONTSERRAT_16       1
+ #endif /* LV_USE_DEMO_MUSIC */
+ 
++/* Smart clock needs a larger numeric font for the clock page */
++#ifndef LV_FONT_MONTSERRAT_24
++#define LV_FONT_MONTSERRAT_24 1
++#endif
++#ifndef LV_FONT_MONTSERRAT_28
++#define LV_FONT_MONTSERRAT_28 1
++#endif
++#ifndef LV_FONT_MONTSERRAT_48
++#define LV_FONT_MONTSERRAT_48 1
++#endif
++
+ /*FreeType library*/
+ #define LV_USE_FREETYPE 0
+ #if LV_USE_FREETYPE
+diff --git a/target/configs/d13x_JLC_rt-thread_helloworld_defconfig b/target/configs/d13x_JLC_rt-thread_helloworld_defconfig
+index 872a03ac..a985caf4 100644
+--- a/target/configs/d13x_JLC_rt-thread_helloworld_defconfig
++++ b/target/configs/d13x_JLC_rt-thread_helloworld_defconfig
+@@ -24,15 +24,15 @@ CONFIG_PLATFORM_LUBANLITE=y
+ #
+ # Filesystem related
+ #
+-CONFIG_AIC_USING_FS_IMAGE_0=y
++# CONFIG_AIC_USING_FS_IMAGE_0 is not set
+ CONFIG_AIC_USING_FS_IMAGE_TYPE_FATFS_FOR_0=y
+ # CONFIG_AIC_USING_FS_IMAGE_TYPE_UFFS_FOR_0 is not set
+ # CONFIG_AIC_USING_FS_IMAGE_TYPE_LITTLEFS_FOR_0 is not set
+-CONFIG_AIC_FS_IMAGE_DIR_0="packages/artinchip/lvgl-ui/aic_demo/demo_hub/assets/480x272"
++CONFIG_AIC_FS_IMAGE_DIR_0="packages/artinchip/lvgl-ui/aic_demo/demo_hub/assets/1024x600"
+ CONFIG_AIC_FS_IMAGE_NAME_0="rodata.fatfs"
+ CONFIG_AIC_FATFS_AUTO_SIZE_FOR_0=y
+ CONFIG_AIC_FATFS_DEFAULT_VOLAB_0=y
+-CONFIG_AIC_USING_FS_IMAGE_1=y
++# CONFIG_AIC_USING_FS_IMAGE_1 is not set
+ # CONFIG_AIC_USING_FS_IMAGE_TYPE_FATFS_FOR_1 is not set
+ # CONFIG_AIC_USING_FS_IMAGE_TYPE_UFFS_FOR_1 is not set
+ CONFIG_AIC_USING_FS_IMAGE_TYPE_LITTLEFS_FOR_1=y
+@@ -48,6 +48,7 @@ CONFIG_AIC_FATFS_ENABLE_WRITE_IN_SPINOR=y
+ # LVGL demo select related
+ #
+ CONFIG_LPKG_USING_LVGL=y
++CONFIG_LPKG_USING_CJSON=y
+ # CONFIG_LVGL_V_8 is not set
+ CONFIG_LVGL_V_9=y
+ CONFIG_LPKG_LVGL_PATH="/packages/multimedia/LVGL/LVGL"
+@@ -57,10 +58,10 @@ CONFIG_LPKG_LVGL_DISP_REFR_PERIOD=5
+ # CONFIG_LPKG_USING_LVGL_SQUARELINE is not set
+ # CONFIG_LPKG_LVGL_USING_EXAMPLES is not set
+ # CONFIG_LPKG_LVGL_USING_DEMOS is not set
+-CONFIG_AIC_LVGL_DEMO=y
++# CONFIG_AIC_LVGL_DEMO is not set
+ # CONFIG_AIC_LVGL_BASE_DEMO is not set
+ # CONFIG_AIC_LVGL_METER_DEMO is not set
+-CONFIG_AIC_LVGL_DEMO_HUB_DEMO=y
++# CONFIG_AIC_LVGL_DEMO_HUB_DEMO is not set
+ # CONFIG_AIC_LVGL_VSCODE_DEMO is not set
+ # CONFIG_AIC_LVGL_LAUNCHER_DEMO is not set
+ # CONFIG_AIC_LVGL_DASHBOARD_DEMO is not set
+@@ -485,43 +486,24 @@ CONFIG_AIC_USING_DE=y
+ CONFIG_AIC_DISPLAY_DRV=y
+ # CONFIG_AIC_DISP_PQ_TOOL is not set
+ CONFIG_AIC_DISP_DE_DRV=y
+-CONFIG_AIC_DISP_RGB_DRV=y
+-# CONFIG_AIC_DISP_LVDS_DRV is not set
++# CONFIG_AIC_DISP_RGB_DRV is not set
++CONFIG_AIC_DISP_LVDS_DRV=y
+ # CONFIG_AIC_DISP_MIPI_DSI_DRV is not set
+-CONFIG_AIC_DISP_RGB=y
+-# CONFIG_AIC_DISP_LVDS is not set
++# CONFIG_AIC_DISP_RGB is not set
++CONFIG_AIC_DISP_LVDS=y
+ # CONFIG_AIC_DISP_MIPI_DSI is not set
+ # CONFIG_AIC_DISP_MIPI_DBI is not set
+-CONFIG_AIC_DI_TYPE=1
+-
+-#
+-# RGB interface options
+-#
+-CONFIG_PRGB_MODE=y
+-# CONFIG_SRGB_MODE is not set
+-CONFIG_AIC_RGB_MODE=0
+-# CONFIG_AIC_PRGB_24BIT is not set
+-# CONFIG_AIC_PRGB_18BIT_LD is not set
+-# CONFIG_AIC_PRGB_18BIT_HD is not set
+-CONFIG_AIC_PRGB_16BIT_LD=y
+-# CONFIG_AIC_PRGB_16BIT_HD is not set
+-# CONFIG_AIC_SRGB_8BIT is not set
+-# CONFIG_AIC_SRGB_6BIT is not set
+-CONFIG_AIC_RGB_FORMAT=3
+-# CONFIG_DATA_ORDER_RGB is not set
+-# CONFIG_DATA_ORDER_RBG is not set
+-CONFIG_DATA_ORDER_BGR=y
+-# CONFIG_DATA_ORDER_BRG is not set
+-# CONFIG_DATA_ORDER_GRB is not set
+-# CONFIG_DATA_ORDER_GBR is not set
+-CONFIG_AIC_RGB_DATA_ORDER=0x00120012
+-# CONFIG_AIC_DEGREE_0 is not set
+-CONFIG_AIC_DEGREE_90=y
+-# CONFIG_AIC_DEGREE_180 is not set
+-# CONFIG_AIC_DEGREE_270 is not set
+-CONFIG_AIC_RGB_CLK_CTL=1
+-# CONFIG_RGB_DATA_MIRROT is not set
+-CONFIG_AIC_RGB_DATA_MIRROR=0
++CONFIG_AIC_DI_TYPE=2
++
++#
++# LVDS interface options
++#
++CONFIG_AIC_LVDS_NS=y
++# CONFIG_AIC_LVDS_JEIDA_24BIT is not set
++# CONFIG_AIC_LVDS_JEIDA_18BIT is not set
++CONFIG_AIC_LVDS_MODE=0
++CONFIG_AIC_LVDS_LINK_0=y
++CONFIG_AIC_LVDS_LINK_MODE=0
+ # CONFIG_AICFB_ARGB8888 is not set
+ # CONFIG_AICFB_ABGR8888 is not set
+ # CONFIG_AICFB_XRGB8888 is not set
+@@ -547,19 +529,20 @@ CONFIG_AIC_SIMPLE_PANEL=y
+ # CONFIG_AIC_PANEL_RGB_ST77922 is not set
+ # CONFIG_AIC_PANEL_SRGB_HX8238 is not set
+ # CONFIG_AIC_PANEL_LCOS_HX7033 is not set
++# CONFIG_AIC_PANEL_BRIDGE_LT8911 is not set
+ 
+ #
+ # display timing of simple panel
+ #
+-CONFIG_PANEL_PIXELCLOCK=12
+-CONFIG_PANEL_HACTIVE=480
+-CONFIG_PANEL_VACTIVE=272
+-CONFIG_PANEL_HBP=43
+-CONFIG_PANEL_HFP=8
+-CONFIG_PANEL_HSW=1
+-CONFIG_PANEL_VBP=12
+-CONFIG_PANEL_VFP=4
+-CONFIG_PANEL_VSW=10
++CONFIG_PANEL_PIXELCLOCK=51
++CONFIG_PANEL_HACTIVE=1024
++CONFIG_PANEL_VACTIVE=600
++CONFIG_PANEL_HBP=136
++CONFIG_PANEL_HFP=160
++CONFIG_PANEL_HSW=24
++CONFIG_PANEL_VBP=21
++CONFIG_PANEL_VFP=12
++CONFIG_PANEL_VSW=2
+ CONFIG_AIC_PWM_BACKLIGHT=y
+ # CONFIG_AIC_GPIO_BACKLIGHT is not set
+ CONFIG_AIC_PWM_BACKLIGHT_CHANNEL=2
+@@ -572,7 +555,7 @@ CONFIG_AIC_USING_GE=y
+ #
+ CONFIG_AIC_GE_CMDQ=y
+ # CONFIG_AIC_GE_NORMAL is not set
+-CONFIG_AIC_GE_DITHER=y
++# CONFIG_AIC_GE_DITHER is not set
+ CONFIG_AIC_GE_CMDQ_BUF_LENGTH=2048
+ # CONFIG_CTRL_GE_CLK_IN_FRAME is not set
+ CONFIG_AIC_USING_VE=y
+@@ -1684,7 +1667,6 @@ CONFIG_AIC_PRINT_FLOAT_CUSTOM=y
+ # CONFIG_LPKG_USING_NETUTILS is not set
+ # CONFIG_LPKG_USING_LIBMODBUS is not set
+ # CONFIG_LPKG_USING_PTPD is not set
+-# CONFIG_LPKG_USING_CJSON is not set
+ # CONFIG_LPKG_USING_MBEDTLS is not set
+ # CONFIG_LPKG_USING_AT24CXX is not set
+ # CONFIG_LPKG_USING_ZLIB is not set
