@@ -1,4 +1,4 @@
-name: build-firmware
+﻿name: build-firmware
 
 on:
   push:
@@ -21,7 +21,7 @@ jobs:
         uses: actions/checkout@v4
 
       - name: Build firmware
-        shell: pwsh
+        shell: powershell
         env:
           SDK_DIR: ${{ vars.SDK_DIR }}
           D13X_TOOLCHAIN_BIN: ${{ vars.D13X_TOOLCHAIN_BIN }}
@@ -47,3 +47,4 @@ jobs:
           generate_release_notes: true
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
