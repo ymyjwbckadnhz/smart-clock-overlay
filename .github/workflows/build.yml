@@ -1,0 +1,50 @@
+name: build-firmware
+
+on:
+  push:
+    branches: [main]
+    tags: ['v*']
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    # This job needs the 1 GB Luban-Lite SDK, Python 2.7 + SCons and the
+    # riscv64-unknown-elf toolchain. A self-hosted Windows runner is the
+    # practical choice; see README "CI/CD".
+    runs-on: [self-hosted, Windows, X64]
+
+    steps:
+      - name: Checkout overlay
+        uses: actions/checkout@v4
+
+      - name: Build firmware
+        shell: pwsh
+        env:
+          SDK_DIR: ${{ vars.SDK_DIR }}
+          D13X_TOOLCHAIN_BIN: ${{ vars.D13X_TOOLCHAIN_BIN }}
+        run: |
+          if (-not $env:SDK_DIR) {
+            throw "Set repository variable SDK_DIR to a Luban-Lite checkout path."
+          }
+          .\.ci\build.ps1 -SdkDir $env:SDK_DIR `
+                          -ToolchainBin $env:D13X_TOOLCHAIN_BIN
+
+      - name: Upload build artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: d13x-smart-clock-firmware
+          path: dist/*
+          if-no-files-found: error
+
+      - name: Publish GitHub Release
+        if: startsWith(github.ref, 'refs/tags/v')
+        uses: softprops/action-gh-release@v2
+        with:
+          files: dist/*
+          generate_release_notes: true
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

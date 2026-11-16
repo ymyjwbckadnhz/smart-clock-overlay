@@ -140,6 +140,56 @@ application/rt-thread/helloworld/smart_clock/
 └── SConscript
 ```
 
+## CI/CD
+
+固件构建需要 **1 GB 的 Luban-Lite SDK、Python 2.7 + SCons、riscv64-unknown-elf 工具链**，
+不适合在 GitHub 托管 runner 上每次重新安装。推荐用你自己的 Windows 机器做
+**self-hosted runner**，SDK 只 clone 一次，之后每次 fetch + reset + apply patch。
+
+### GitHub Actions
+
+1. 在 GitHub 仓库 **Settings → Actions → Runners → New self-hosted runner** 添加 Windows runner，
+   按页面提示下载、`config.cmd`、`run.cmd`（建议注册为 Windows 服务）。
+2. 在仓库 **Settings → Secrets and variables → Actions → Variables** 添加：
+   - `SDK_DIR`：Luban-Lite checkout 路径，例如 `C:\d13x-sdk`
+   - `D13X_TOOLCHAIN_BIN`：工具链 `bin` 目录（可选，如果已在 PATH 中）
+3. 确保 runner 的 PATH 中有：
+   - `scons`
+   - 对应 Python 2.7 环境
+   - `riscv64-unknown-elf-gcc`
+4. push 到 `main` / PR 会构建并上传 artifact；push `v*` tag 会创建 GitHub Release：
+   ```bash
+   git tag -a v1.0.0 -m "Smart Clock v1.0.0"
+   git push origin v1.0.0
+   ```
+5. 工作流：`.github/workflows/build.yml`；构建脚本：`.ci/build.ps1`。
+
+首次运行会自动 clone SDK；之后每次重置到 `f5be1e4c`、打 patch、复制应用并编译。
+产物在 `dist/`：`.img`、`SHA256SUMS.txt`（如果 `sd/` 存在，也会带上字库 `.bin`）。
+
+> self-hosted runner 会执行仓库里的脚本，只把它挂在可信仓库/分支上。
+
+### Gitee
+
+- 可以把同一仓库镜像到 Gitee；Gitee Go 选择 **Windows 主机组/自定义 runner**，
+  构建步骤直接执行：
+  ```powershell
+  .\.ci\build.ps1 -SdkDir C:\d13x-sdk
+  ```
+- Gitee 发行版可以用 Gitee Go 的“发行版/附件”步骤，或调用 Gitee API 上传 `dist/*`；
+  Token 放在流水线变量里，不要写进仓库。
+- 如果只想用一套 CI，建议 **GitHub Actions 负责构建/Release，Gitee 作为镜像仓库**，
+  避免维护两套流水线。
+
+### 本地模拟
+
+Windows 上也可以直接跑同一套脚本：
+
+```powershell
+$env:SDK_DIR = "C:\d13x-sdk"
+.\.ci\build.ps1 -SdkDir $env:SDK_DIR
+```
+
 ## 字体与许可证提醒
 
 - 本仓库的 `font_cjk_16.c` / `font_cjk_20.c` 由 **Windows 宋体（SimSun）** 生成，`font_icon.c` 由 **Segoe UI Symbol** 生成。Windows 字体通常不允许再分发字形数据；如果要公开仓库，建议用 **Noto Serif CJK / 思源宋体** 和开源图标集重新生成，或先确认字体授权。
