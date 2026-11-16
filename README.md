@@ -2,6 +2,10 @@
 
 基于 **Luban-Lite SDK + LVGL 9.1.0** 的 7 英寸 1024×600 LVDS 智能面板应用层。
 
+- GitHub：<https://github.com/ymyjwbckadnhz/smart-clock-overlay>
+- Gitee 镜像：<https://gitee.com/OvO_rain/smart-clock-overlay>
+- Gitee Release：<https://gitee.com/OvO_rain/smart-clock-overlay/releases/tag/v1.0.0>
+
 本仓库**不包含完整的 Luban-Lite SDK**，只包含：
 
 - `application/rt-thread/helloworld/smart_clock/`：五页 UI、网络、字库、图标
