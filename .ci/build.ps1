@@ -66,6 +66,10 @@ New-Item -ItemType Directory -Force $OutDir | Out-Null
 Copy-Item $image $OutDir
 Copy-Item (Join-Path $repoRoot "README.md") $OutDir -ErrorAction SilentlyContinue
 Copy-Item (Join-Path $repoRoot "THIRD_PARTY_NOTICES.md") $OutDir -ErrorAction SilentlyContinue
+Copy-Item (Join-Path $repoRoot "LICENSE") $OutDir -ErrorAction SilentlyContinue
+if (Test-Path (Join-Path $repoRoot "LICENSES")) {
+    Copy-Item (Join-Path $repoRoot "LICENSES") $OutDir -Recurse -Force
+}
 
 $sdDir = Join-Path $repoRoot "sd"
 if (Test-Path $sdDir) {
