@@ -1,4 +1,4 @@
-﻿name: build-firmware
+name: build-firmware
 
 on:
   push:
@@ -26,10 +26,12 @@ jobs:
           SDK_DIR: ${{ vars.SDK_DIR }}
           D13X_TOOLCHAIN_BIN: ${{ vars.D13X_TOOLCHAIN_BIN }}
         run: |
-          if (-not $env:SDK_DIR) {
-            throw "Set repository variable SDK_DIR to a Luban-Lite checkout path."
+          $sdk = $env:SDK_DIR
+          if (-not $sdk) { $sdk = $env:D13X_SDK_DIR }
+          if (-not $sdk) {
+            throw "Set repository variable SDK_DIR (or runner .env D13X_SDK_DIR)."
           }
-          .\.ci\build.ps1 -SdkDir $env:SDK_DIR `
+          .\.ci\build.ps1 -SdkDir $sdk `
                           -ToolchainBin $env:D13X_TOOLCHAIN_BIN
 
       - name: Upload build artifact
