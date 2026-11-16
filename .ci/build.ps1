@@ -21,6 +21,7 @@ $extraPaths = @(
     (Join-Path $envRoot "tools\bin"),
     (Join-Path $envRoot "tools\Python27\Scripts"),
     (Join-Path $envRoot "tools\Python27"),
+    (Join-Path $envRoot "tools\Python38"),
     (Join-Path $SdkDir "toolchain\bin")
 )
 if ($ToolchainBin) { $extraPaths = @($ToolchainBin) + $extraPaths }
@@ -65,6 +66,21 @@ Remove-Item $appDst -Recurse -Force -ErrorAction SilentlyContinue
 Copy-Item (Join-Path $repoRoot "application\rt-thread\helloworld\smart_clock") `
     (Join-Path $SdkDir "application\rt-thread\helloworld") -Recurse -Force
 if ($LASTEXITCODE -ne 0) { throw "copy application failed" }
+
+# The SDK normally generates this ignored header as a side effect of a full
+# build. A clean checkout needs it before compiling net.c/fal_cfg.h.
+$py3 = Join-Path $envRoot "tools\Python38\python3.exe"
+$gen = Join-Path $SdkDir "tools\scripts\gen_partition_table.py"
+$imgCfg = Join-Path $SdkDir "target\d13x\JLC\pack\image_cfg.json"
+$partJson = Join-Path $SdkDir "output\d13x_JLC_rt-thread_helloworld\images\partition.json"
+New-Item -ItemType Directory -Force (Split-Path $partJson) | Out-Null
+if (Test-Path $py3) {
+    & $py3 $gen -c $imgCfg -o (Join-Path $SdkDir "partition_table.h") -j $partJson
+}
+else {
+    python3 $gen -c $imgCfg -o (Join-Path $SdkDir "partition_table.h") -j $partJson
+}
+if ($LASTEXITCODE -ne 0) { throw "generate partition_table.h failed" }
 
 Push-Location $SdkDir
 try {
